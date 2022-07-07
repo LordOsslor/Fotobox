@@ -43,6 +43,6 @@ class Ui_Dialog(object):
         _translate = QtCore.QCoreApplication.translate
         Dialog.setWindowTitle(_translate("Dialog", "Dialog"))
         self.label.setText(_translate("Dialog", "Teilen wirklich beenden?\n"
-"Der Link ist danach nichtmehr zu sehen"))
+"Der Code ist danach nicht mehr zu sehen."))
         self.pushButton.setText(_translate("Dialog", "Ja, ich bin mir sicher"))
         self.pushButton_2.setText(_translate("Dialog", "Nein"))

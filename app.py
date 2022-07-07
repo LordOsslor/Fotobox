@@ -1,5 +1,8 @@
+import json
 import os
 import sys
+import requests
+
 
 from urllib.parse import urljoin
 from time import time
@@ -7,6 +10,7 @@ from secrets import token_urlsafe
 from enum import Enum, auto
 from typing import List
 from zipfile import ZipFile
+
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from qrcode import QRCode
@@ -28,7 +32,7 @@ timerInterval = 250
 class Program:
 
     # consts:
-    url_root: str = "http://192.168.178.100/q/"
+    url_root: str = "http://localhost"
     image_root: str = "fotos"
     zip_root: str = "zips"
     zip_name: str = "09.07. - Bilder_vom_Gemeinderat"
@@ -48,12 +52,15 @@ class Program:
         dialog: QtWidgets.QDialog,
         image_root: str = "",
         zip_root: str = "",
+        url_root: str = "",
     ) -> None:
 
         if image_root:
             self.image_root = image_root
         if zip_root:
             self.zip_root = zip_root
+        if url_root:
+            self.url_root = url_root
 
         if not os.path.exists(self.image_root):
             os.mkdir(self.image_root)
@@ -113,6 +120,8 @@ class Program:
 
         fitting_paths = []
         for image_path in image_paths:
+            if "tmpfile" in image_path:
+                continue
             abs_image_path = os.path.join(self.image_root, image_path)
             ctime = os.path.getctime(abs_image_path)
             if self.start_time < ctime < et and image_path not in self.known_images:
@@ -187,11 +196,15 @@ if __name__ == "__main__":
     dialog = QtWidgets.QDialog(mainWindow)
     dialog_ui = Ui_Dialog()
     dialog_ui.setupUi(dialog)
-    # print(dialog.exec())
 
-    x = Program(ui, dialog)
+    resp = requests.get("http://localhost:4040/api/tunnels")
+    if resp.text:
+        js = json.loads(resp.text)
+        t_url = js["tunnels"][0]["public_url"]
+        x = Program(ui, dialog, url_root=t_url)
 
-    # x = Program(ui, dialog, image_root="/run/user/1000/d2fa8138b23971ac/DCIM_Camera")
+    else:
+        x = Program(ui, dialog)
 
     if "nfs" in sys.argv[1:]:
         mainWindow.show()
