@@ -38,6 +38,7 @@ class Program:
     zip_name: str = "09.07. - Bilder_vom_Gemeinderat"
     state: States = States.Stopped
     known_images: List[str] = []
+    overview: bool = True
 
     ui: Ui_MainWindow
     main_timer: QtCore.QTimer
@@ -80,6 +81,13 @@ class Program:
 
         # button event:
         self.ui.ss_btn.clicked.connect(self.ss_click)
+        self.ui.overview_btn.clicked.connect(self.overview_click)
+        self.ui.overview_btn.setEnabled(False)
+
+    def overview_click(self):
+        self.overview = True
+        self.ui.overview_btn.setEnabled(False)
+        self.show_overview()
 
     def gen_qr_code(self) -> QtGui.QPixmap:
         qr = QRCode()
@@ -136,7 +144,11 @@ class Program:
 
         return fitting_paths
 
+    def show_overview(self):
+        map_items: List[QtWidgets.QGraphicsPixmapItem] = []
     def selected_item_change(self, s: str):
+        self.overview = False
+        self.ui.overview_btn.setEnabled(True)
         self.set_image(QtGui.QPixmap(os.path.join(self.image_root, s)))
 
     def start(self):
@@ -197,7 +209,8 @@ if __name__ == "__main__":
     dialog_ui = Ui_Dialog()
     dialog_ui.setupUi(dialog)
 
-    resp = requests.get("http://localhost:4040/api/tunnels")
+    if "ngrok" in sys.argv[1:]:
+        resp = requests.get("http://localhost:4040/api/tunnels")
     if resp.text:
         js = json.loads(resp.text)
         t_url = js["tunnels"][0]["public_url"]
