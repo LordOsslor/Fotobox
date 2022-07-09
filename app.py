@@ -2,6 +2,7 @@ import json
 import os
 import sys
 import requests
+import math
 
 
 from urllib.parse import urljoin
@@ -39,6 +40,7 @@ class Program:
     state: States = States.Stopped
     known_images: List[str] = []
     overview: bool = True
+    overview_images: List[QtWidgets.QLabel] = []
 
     ui: Ui_MainWindow
     main_timer: QtCore.QTimer
@@ -77,17 +79,23 @@ class Program:
         self.main_timer.timeout.connect(self.timer_tick)
 
         # preview:
-        self.ui.image_list.currentTextChanged.connect(self.selected_item_change)
+        # self.ui.image_list.currentTextChanged.connect(self.selected_item_change)
 
         # button event:
         self.ui.ss_btn.clicked.connect(self.ss_click)
         self.ui.overview_btn.clicked.connect(self.overview_click)
         self.ui.overview_btn.setEnabled(False)
 
+        self.screen_saver()
+
+    def screen_saver(self):
+        self.set_single_image(QtGui.QPixmap("DEU_Egestorf_COA.jpg"))
+
     def overview_click(self):
         self.overview = True
         self.ui.overview_btn.setEnabled(False)
-        self.show_overview()
+        self.clear_images()
+        self.update_overview()
 
     def gen_qr_code(self) -> QtGui.QPixmap:
         qr = QRCode()
@@ -112,20 +120,10 @@ class Program:
         self.ui.image_list.addItems(self.get_new_images())
         self.update_time()
 
-    def set_image(self, pmap: QtGui.QPixmap):
-        item = QtWidgets.QGraphicsPixmapItem(pmap)
-        scene = QtWidgets.QGraphicsScene()
-        scene.addItem(item)
-
-        self.ui.preview.setScene(scene)
-        self.ui.preview.fitInView(
-            scene.sceneRect(), QtCore.Qt.AspectRatioMode.KeepAspectRatio
-        )
-
     def get_new_images(self) -> list[str]:
         image_paths = os.listdir(self.image_root)
         et = self.end_time if self.end_time > 0 else time()
-
+        new_files = False
         fitting_paths = []
         for image_path in image_paths:
             if "tmpfile" in image_path:
@@ -135,6 +133,15 @@ class Program:
             if self.start_time < ctime < et and image_path not in self.known_images:
                 fitting_paths.append(image_path)
                 self.known_images.append(image_path)
+                new_files = True
+
+        if new_files:
+            self.clear_images()
+            if self.overview:
+                self.update_overview()
+            else:
+                self.ui.image_list.setCurrentRow(len(self.known_images))
+                self.selected_item_change(self.known_images[-1])
         count = len(self.known_images)
         self.ui.counter.setProperty("intValue", count)
         if count == 0:
@@ -144,12 +151,59 @@ class Program:
 
         return fitting_paths
 
-    def show_overview(self):
-        map_items: List[QtWidgets.QGraphicsPixmapItem] = []
+    def clear_images(self):
+        for item in self.overview_images:
+            item.deleteLater()
+        self.overview_images = []
+
+    def update_overview(self):
+        c = len(self.known_images)
+        x, y = 1500, 1000
+
+        xc = math.ceil(math.sqrt(c))
+        yc = math.ceil(c / xc)
+
+        ix, iy = int(x / xc), int(y / yc)
+
+        pos_list = [(i % xc + 1, math.floor(i / xc) + 1) for i in range(0, c)]
+
+        pmaps = [
+            QtGui.QPixmap(os.path.join(self.image_root, image_name)).scaled(
+                ix,
+                iy,
+                QtCore.Qt.AspectRatioMode.KeepAspectRatio,
+                QtCore.Qt.TransformationMode.FastTransformation,
+            )
+            for image_name in self.known_images
+        ]
+
+        usable_index = len(self.overview_images)
+
+        for i, (pmap, pos) in enumerate(zip(pmaps, pos_list)):
+            if i <= usable_index and usable_index != 0:
+                label = self.overview_images[i]
+            else:
+                label = QtWidgets.QLabel()
+                label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+                self.overview_images.append(label)
+            label.setPixmap(pmap)
+            self.ui.preview_grid.addWidget(label, pos[1], pos[0])
+
+    def set_single_image(self, pmap: QtGui.QPixmap):
+        self.clear_images()
+
+        pmap = pmap.scaled(1500, 1065, QtCore.Qt.AspectRatioMode.KeepAspectRatio)
+        pic = QtWidgets.QLabel()
+        pic.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.overview_images = [pic]
+        pic.setPixmap(pmap)
+
+        self.ui.preview_grid.addWidget(pic)
+
     def selected_item_change(self, s: str):
         self.overview = False
         self.ui.overview_btn.setEnabled(True)
-        self.set_image(QtGui.QPixmap(os.path.join(self.image_root, s)))
+        self.set_single_image(QtGui.QPixmap(os.path.join(self.image_root, s)))
 
     def start(self):
         self.state = States.Started
@@ -158,7 +212,7 @@ class Program:
         self.main_timer.start()
         self.ui.ss_btn.setText("Teilen")
         self.tick_count = 0
-        self.current_id = token_urlsafe(16)
+        self.current_id = token_urlsafe(12)
         self.ui.image_list.currentTextChanged.connect(self.selected_item_change)
         self.ui.ss_btn.setEnabled(False)
 
@@ -169,8 +223,7 @@ class Program:
         self.ui.ss_btn.setText("Fertig")
         self.ui.image_list.currentTextChanged.disconnect()
         self.ui.image_list.setEnabled(False)
-        self.ui.preview_label.setText("QR-Code:")
-        self.set_image(self.gen_qr_code())
+        self.set_single_image(self.gen_qr_code())
         zip_path = os.path.join(self.zip_root, self.current_id)
         os.mkdir(zip_path)
         with ZipFile(os.path.join(zip_path, f"{self.zip_name}.zip"), "w") as zip:
@@ -183,12 +236,11 @@ class Program:
         self.state = States.Stopped
         self.ui.ss_btn.setText("Start")
         self.ui.image_list.clear()
-        self.ui.preview.setScene(QtWidgets.QGraphicsScene())
         self.ui.time.setText("00:00")
         self.known_images = []
         self.ui.counter.setProperty("intValue", 0)
         self.ui.image_list.setEnabled(True)
-        self.ui.preview_label.setText("Vorschau:")
+        self.screen_saver()
 
     def ss_click(self):
         match self.state:
@@ -211,7 +263,6 @@ if __name__ == "__main__":
 
     if "ngrok" in sys.argv[1:]:
         resp = requests.get("http://localhost:4040/api/tunnels")
-    if resp.text:
         js = json.loads(resp.text)
         t_url = js["tunnels"][0]["public_url"]
         x = Program(ui, dialog, url_root=t_url)
