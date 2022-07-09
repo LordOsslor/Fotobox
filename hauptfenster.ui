@@ -240,6 +240,13 @@
           </item>
          </layout>
         </item>
+        <item>
+         <widget class="QPushButton" name="shutter_btn">
+          <property name="text">
+           <string>Auslöser fernbetätigen</string>
+          </property>
+         </widget>
+        </item>
        </layout>
       </widget>
      </item>

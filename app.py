@@ -41,6 +41,7 @@ class Program:
     known_images: List[str] = []
     overview: bool = True
     overview_images: List[QtWidgets.QLabel] = []
+    capture_count: int = 0
 
     ui: Ui_MainWindow
     main_timer: QtCore.QTimer
@@ -84,9 +85,16 @@ class Program:
         # button event:
         self.ui.ss_btn.clicked.connect(self.ss_click)
         self.ui.overview_btn.clicked.connect(self.overview_click)
+        self.ui.shutter_btn.clicked.connect(self.capture_img)
         self.ui.overview_btn.setEnabled(False)
 
         self.screen_saver()
+
+    def capture_img(self):
+        os.system(
+            f"gphoto2 --capture-image-and-download --filename IMG_{self.capture_count}_M.jpg"
+        )
+        self.capture_count += 1
 
     def screen_saver(self):
         self.set_single_image(QtGui.QPixmap("DEU_Egestorf_COA.jpg"))
