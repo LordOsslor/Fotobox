@@ -87,14 +87,25 @@ class Program:
         self.ui.overview_btn.clicked.connect(self.overview_click)
         self.ui.shutter_btn.clicked.connect(self.capture_img)
         self.ui.overview_btn.setEnabled(False)
+        self.ui.shutter_btn.setEnabled(False)
+
+        self.ss_shortcut = QtWidgets.QShortcut(
+            QtGui.QKeySequence("Space"), self.ui.centralwidget
+        )
+        self.ss_shortcut.activated.connect(self.ss_click)
+        self.capture_shortcut = QtWidgets.QShortcut(
+            QtGui.QKeySequence("Return"), self.ui.centralwidget
+        )
+        self.capture_shortcut.activated.connect(self.capture_img)
 
         self.screen_saver()
 
     def capture_img(self):
-        os.system(
-            f"gphoto2 --capture-image-and-download --filename IMG_{self.capture_count}_M.jpg"
-        )
-        self.capture_count += 1
+        if self.ui.shutter_btn.isEnabled():
+            os.system(
+                f"gphoto2 --capture-image-and-download --force-overwrite --filename fotos/IMG_{self.capture_count}_M.jpg"
+            )
+            self.capture_count += 1
 
     def screen_saver(self):
         self.set_single_image(QtGui.QPixmap("DEU_Egestorf_COA.jpg"))
@@ -166,6 +177,8 @@ class Program:
 
     def update_overview(self):
         c = len(self.known_images)
+        if c == 0:
+            return
         x, y = 1500, 1000
 
         xc = math.ceil(math.sqrt(c))
@@ -223,6 +236,8 @@ class Program:
         self.current_id = token_urlsafe(12)
         self.ui.image_list.currentTextChanged.connect(self.selected_item_change)
         self.ui.ss_btn.setEnabled(False)
+        self.ui.shutter_btn.setEnabled(True)
+        self.ui.overview_btn.setEnabled(False)
 
     def share(self):
         self.state = States.Sharing
@@ -231,6 +246,8 @@ class Program:
         self.ui.ss_btn.setText("Fertig")
         self.ui.image_list.currentTextChanged.disconnect()
         self.ui.image_list.setEnabled(False)
+        self.ui.overview_btn.setEnabled(False)
+        self.ui.shutter_btn.setEnabled(False)
         self.set_single_image(self.gen_qr_code())
         zip_path = os.path.join(self.zip_root, self.current_id)
         os.mkdir(zip_path)
@@ -251,13 +268,14 @@ class Program:
         self.screen_saver()
 
     def ss_click(self):
-        match self.state:
-            case States.Stopped:
-                self.start()
-            case States.Started:
-                self.share()
-            case States.Sharing:
-                self.stop()
+        if self.ui.ss_btn.isEnabled():
+            match self.state:
+                case States.Stopped:
+                    self.start()
+                case States.Started:
+                    self.share()
+                case States.Sharing:
+                    self.stop()
 
 
 if __name__ == "__main__":
